@@ -37,7 +37,6 @@ do
   state:__autoSync(true)
 
   -- Initial state
-  state.key = "no key"
   state.x, state.y = 20, 20
 
   -- Network stuff
@@ -83,16 +82,6 @@ do
         -- Received a request?
         if event.type == "receive" then
           local request = marshal.decode(event.data)
-
-          -- Keypress?
-          if request.type == "keypressed" then
-            state.key = request.key
-          end
-
-          -- Mousepress?
-          if request.type == "mousepressed" then
-            state.x, state.y = request.x, request.y
-          end
 
           if request.type == "mousemoved" then
             state.x, state.y = request.x, request.y
@@ -152,21 +141,7 @@ do
   function client.draw()
     if state then -- `nil` till we receive first update, so guard for that
       -- Draw key name at position
-      love.graphics.print(state.key, state.x, state.y)
-    end
-  end
-
-  function client.keypressed(key)
-    if peer then -- `nil` till we connect, so guard for that
-      -- Send keypress request to server
-      peer:send(marshal.encode({type = "keypressed", key = key}))
-    end
-  end
-
-  function client.mousepressed(x, y, button)
-    if peer then -- `nil` till we connect, so guard for that
-      -- Send mousepress request to server
-      peer:send(marshal.encode({type = "mousepressed", x = x, y = y}))
+      love.graphics.circle("fill", state.x, state.y, 30)
     end
   end
 
@@ -194,15 +169,12 @@ function love.keypressed(key)
   if not server.started and key == "0" then
     server.start()
   end
-
-  client.keypressed(key)
 end
 
 function love.mousepressed(x, y, button)
   if not client.connected then
     client.connect()
   end
-  client.mousepressed(x, y, button)
 end
 
 function love.mousemoved(x, y, dx, dy, istouch)

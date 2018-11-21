@@ -37,7 +37,7 @@ do
   state:__autoSync(true)
 
   -- Initial state
-  state.x, state.y = 20, 20
+  state.mice = {}
 
   -- Network stuff
   local host  -- The host
@@ -69,13 +69,17 @@ do
 
         -- Someone connected?
         if event.type == "connect" then
-          peers[event.peer] = true -- Remember this client
+          local clientId = math.random(10000000)
+          local r, g, b = math.random(), math.random(), math.random()
+          peers[event.peer] = clientId
+          state.mice[clientId] = {x = 0, y = 0, color = {r = r, g = g, b = b}}
           -- `true` below is for 'exact' -- send full state on connect, not just a diff
           event.peer:send(marshal.encode(state:__diff(event.peer, true)))
         end
 
         -- Someone disconnected?
         if event.type == "disconnect" then
+          state.mice[peers[event.peer]] = nil
           peers[event.peer] = nil
         end
 
@@ -84,7 +88,8 @@ do
           local request = marshal.decode(event.data)
 
           if request.type == "mousemoved" then
-            state.x, state.y = request.x, request.y
+            local mouse = state.mice[peers[event.peer]]
+            mouse.x, mouse.y = request.x, request.y
           end
         end
       end
@@ -141,7 +146,12 @@ do
   function client.draw()
     if state then -- `nil` till we receive first update, so guard for that
       -- Draw key name at position
-      love.graphics.circle("fill", state.x, state.y, 30)
+      for clientId, mouse in pairs(state.mice) do
+        love.graphics.push("all")
+        love.graphics.setColor(mouse.color.r, mouse.color.g, mouse.color.b)
+        love.graphics.circle("fill", mouse.x, mouse.y, 30)
+        love.graphics.pop()
+      end
     end
   end
 

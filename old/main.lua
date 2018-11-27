@@ -54,7 +54,7 @@ do
     for peer in pairs(peers) do
       local diff = state:__diff(peer)
       if diff ~= nil then -- `nil` if nothing changed
-        peer:send(marshal.encode(diff))
+        peer:send(marshal.encode({type = "diff", diff = diff}))
       end
     end
     state:__flush() -- Make sure to reset diff state after sending!
@@ -73,8 +73,9 @@ do
           local r, g, b = math.random(), math.random(), math.random()
           peers[event.peer] = clientId
           state.mice[clientId] = {x = 0, y = 0, color = {r = r, g = g, b = b}}
+          event.peer:send(marshal.encode({type = "clientId", clientId = clientId}))
           -- `true` below is for 'exact' -- send full state on connect, not just a diff
-          event.peer:send(marshal.encode(state:__diff(event.peer, true)))
+          event.peer:send(marshal.encode({type = "diff", diff = state:__diff(event.peer, true)}))
         end
 
         -- Someone disconnected?
@@ -112,6 +113,8 @@ do
   local host  -- The host
   local peer  -- The server
 
+  local myClientId
+
   -- Connect to server
   function client.connect()
     host = enet.host_create()
@@ -135,9 +138,13 @@ do
 
         -- Received state diff?
         if event.type == "receive" then
-          local diff = marshal.decode(event.data)
-          print("received", serpent.block(diff)) -- Print the diff, for debugging
-          state = share.apply(state, diff)
+          local request = marshal.decode(event.data)
+          -- print("received", serpent.block(request)) -- Print the diff, for debugging
+          if request.type == "diff" then
+            state = share.apply(state, request.diff)
+          elseif request.type == "clientId" then
+            myClientId = request.clientId
+          end
         end
       end
     end
@@ -146,10 +153,21 @@ do
   function client.draw()
     if state then -- `nil` till we receive first update, so guard for that
       -- Draw key name at position
+
       for clientId, mouse in pairs(state.mice) do
+        local x, y = mouse.x, mouse.y
+        if clientId == myClientId then
+          x, y = love.mouse.getPosition()
+        end
+
         love.graphics.push("all")
         love.graphics.setColor(mouse.color.r, mouse.color.g, mouse.color.b)
-        love.graphics.circle("fill", mouse.x, mouse.y, 30)
+        love.graphics.circle("fill", x, y, 30)
+        if clientId == myClientId then
+          love.graphics.setColor(1, 1, 1)
+          love.graphics.setLineWidth(5)
+          love.graphics.circle("line", x, y, 35)
+        end
         love.graphics.pop()
       end
     end

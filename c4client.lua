@@ -8,7 +8,8 @@ local Object = classic
 local brighten = require "./brighten"
 
 client.enabled = true
-client.start("192.168.1.224:22122") -- IP address ('127.0.0.1' is same computer) and port of server
+-- client.start("192.168.1.224:22122") -- IP address ('127.0.0.1' is same computer) and port of server
+client.start("192.168.1.33:22122") -- IP address ('127.0.0.1' is same computer) and port of server
 -- client.start("127.0.0.1:22122") -- IP address ('127.0.0.1' is same computer) and port of server
 
 -- Client connects to server. It gets a unique `id` to identify it.
@@ -41,6 +42,9 @@ end
 
 function client.update(dt)
   home.mouse.x, home.mouse.y = love.mouse.getPosition()
+  if home.mouse.x > 10 + 80 * 7 + 80 then
+    home.mouse.loaded = true
+  end
 end
 
 local Board = Object:extend()
@@ -97,6 +101,15 @@ function Board:draw()
       end
     end
   end
+
+  love.graphics.setColor(0.8, 0.8, 0.8)
+  love.graphics.setLineWidth(8)
+  local size = self.size
+  local reloadX = self.x + size * self.columns + size
+  love.graphics.line(reloadX, self.y, reloadX, self.y + size * self.rows + size)
+  love.graphics.setColor(1, 1, 1)
+  love.graphics.setFont(love.graphics.newFont(size))
+  love.graphics.print("Reload", reloadX + size / 2, self.y + size * 5, math.pi / -2)
   love.graphics.pop()
 end
 
@@ -116,7 +129,12 @@ function client.draw()
     end
     -- love.graphics.circle("fill", home.mouse.x, home.mouse.y, 40, 40)
     local mouseX, mouseY = love.mouse.getPosition()
-    love.graphics.circle("fill", mouseX, mouseY, 40, 40)
+    local mode = "line"
+    local mouse = share.mice[client.id]
+    if mouse and mouse.loaded then
+      mode = "fill"
+    end
+    love.graphics.circle(mode, mouseX, mouseY, 40, 40)
 
     -- Draw other mice
     for id, mouse in pairs(share.mice) do
@@ -128,7 +146,11 @@ function client.draw()
       end
 
       if id ~= client.id then -- Only draw others' mice this way
-        love.graphics.circle("fill", mouse.x, mouse.y, 30, 30)
+        local mode = "fill"
+        if not mouse.loaded then
+          mode = "line"
+        end
+        love.graphics.circle(mode, mouse.x, mouse.y, 30, 30)
       end
     end
 
@@ -144,6 +166,8 @@ function client.draw()
       local c = share.colors[winner]
       love.graphics.setColor(c.r, c.g, c.b)
       love.graphics.print("WINNER!!!", 100, 530)
+      love.graphics.setFont(love.graphics.newFont(25))
+      love.graphics.print("(Restart)", 200, 620)
     end
   else
     love.graphics.print("not connected", 20, 20)
@@ -153,8 +177,16 @@ end
 function love.mousepressed(x, y, button, istouch)
   if button == 1 then -- Versions prior to 0.10.0 use the MouseConstant 'l'
     local board = Board(share.board, share.rows, share.columns)
+    if share.win and y > board.y + board.rows * board.size then
+      client.send("restart")
+      return
+    end
     local col = board:whichColumn(x, y)
-    client.send("place", col)
+    if col then
+      client.send("place", col)
+      home.mouse.loaded = false
+    end
+
   end
 end
 

@@ -39,6 +39,11 @@ function server.receive(id, op, col) -- Called when client with `id` does `clien
     if not col then
       return
     end
+    local mouse = share.mice[id]
+    if not mouse.loaded then
+      print("not loaded; can't place. reload")
+      return
+    end
     if share.board[1][col] then
       -- can't place the thing
       print("can't place")
